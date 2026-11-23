@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CUSTOMER
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(CUSTOMER)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  accessRequests   AccessRequest[]
+  videoPermissions VideoPermission[]
+
+  @@map("users")
+}
+
+model Video {
+  id             String    @id @default(cuid())
+  title          String
+  description    String?
+  originalName   String
+  storedFileName String    @unique
+  fileSize       Int
+  mimeType       String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  accessRequests   AccessRequest[]
+  videoPermissions VideoPermission[]
+
+  @@map("videos")
+}
+
+model AccessRequest {
+  id                       String        @id @default(cuid())
+  userId                   String
+  videoId                  String
+  status                   RequestStatus @default(PENDING)
+  note                     String?
+  requestedDurationMinutes Int?
+  grantedDurationMinutes   Int?
+  requestedAt              DateTime      @default(now())
+  reviewedAt               DateTime?
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video           Video            @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoPermission VideoPermission?
+
+  @@index([userId, videoId, status])
+  @@map("access_requests")
+}
+
+model VideoPermission {
+  id              String    @id @default(cuid())
+  userId          String
+  videoId         String
+  requestId       String?   @unique
+  durationMinutes Int       @default(60)
+  grantedAt       DateTime  @default(now())
+  startedAt       DateTime?
+  expiresAt       DateTime?
+  revokedAt       DateTime?
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video         Video          @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  accessRequest AccessRequest? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([userId, videoId, expiresAt])
+  @@map("video_permissions")
+}
